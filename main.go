@@ -9,30 +9,18 @@ import (
 	"os"
 )
 
-var proj string = "iot-lora-165218"
-
-//define a function for the default message handler
-var publishHandler MQTT.MessageHandler = func(client MQTT.Client, msg MQTT.Message) {
-	fmt.Printf("TOPIC: %s\n", msg.Topic())
-	fmt.Printf("MSG: %s\n", msg.Payload())
-}
-
-var subscribeHandler MQTT.MessageHandler = func(client MQTT.Client, msg MQTT.Message) {
-	item := decode(msg.Payload())
-	fmt.Printf("MSG: %s\n", item)
-
-	insertRow("IoT", "pressure", item)
-}
+var ttn_app string = os.Getenv("TTN_APP")
+var ttn_key string = os.Getenv("TTN_KEY")
+var project string = os.Getenv("GCP_PROJECT")
 
 func main() {
 	done := make(chan bool)
 
 	opts := MQTT.NewClientOptions()
 	opts.AddBroker("tcp://eu.thethings.network:1883")
-	opts.SetUsername("test_gertjan")
-	opts.SetPassword("ttn-account-v2.ZhjCVxlzIP1I_7izCc7qn8ZWVWsBYx1DzYEN3RA3_Xw")
+	opts.SetUsername(ttn_app)
+	opts.SetPassword(ttn_key)
 	opts.SetClientID("mqtt-bigquery-bridge")
-	opts.SetDefaultPublishHandler(publishHandler)
 
 	mqttClient := MQTT.NewClient(opts)
 	if token := mqttClient.Connect(); token.Wait() && token.Error() != nil {
@@ -48,7 +36,7 @@ func main() {
 		fmt.Println("Subscribed")
 	}
 
-	<-done
+	<-done //block forever
 
 	//unsubscribe from /go-mqtt/sample
 	if token := mqttClient.Unsubscribe("+/devices/+/up"); token.Wait() && token.Error() != nil {
@@ -61,8 +49,18 @@ func main() {
 	mqttClient.Disconnect(250)
 }
 
-func decode(bytes []byte) Item {
+var subscribeHandler MQTT.MessageHandler = func(client MQTT.Client, msg MQTT.Message) {
+	appid, devid, item := decode(msg.Payload())
+	fmt.Printf("MSG: %s\n", item)
 
+	err := insertRow(appid, devid, item)
+	if err != nil {
+		fmt.Printf("ERROR: %s\n", err)
+	}
+}
+
+func decode(bytes []byte) (string, string, interface{}) {
+	fmt.Println("1")
 	var f interface{}
 	err := json.Unmarshal(bytes, &f)
 
@@ -72,29 +70,22 @@ func decode(bytes []byte) Item {
 
 	m := f.(map[string]interface{})
 
-	fields := m["payload_fields"].(map[string]interface{})
+	app_id := m["app_id"].(string)
 	metadata := m["metadata"].(map[string]interface{})
+	fields := m["payload_fields"].(map[string]interface{})
 
-	celcius := fields["celcius"].(float64)
-	mbar := fields["mbar"].(float64)
+	dev_id := m["dev_id"].(string)
 	timestamp := metadata["time"].(string)
 
-	return Item{celcius, mbar, timestamp}
+	item := deviceFromFields(dev_id, timestamp, fields)
+	return app_id, dev_id, item
 }
 
-type Item struct {
-	Celcius   float64
-	Mbar      float64
-	Timestamp string
-}
-
-func insertRow(datasetID, tableID string, item Item) error {
+func insertRow(datasetID, tableID string, item interface{}) error {
 	ctx := context.Background()
-	bqClient, err := BQ.NewClient(ctx, proj)
+	bqClient, err := BQ.NewClient(ctx, project)
 	if err != nil {
 		panic(err)
-	} else {
-		fmt.Println("BigQuery Client initialised")
 	}
 
 	u := bqClient.Dataset(datasetID).Table(tableID).Uploader()
