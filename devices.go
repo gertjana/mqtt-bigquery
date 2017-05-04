@@ -30,9 +30,17 @@ func deviceFromFields(device string, timestamp string, fields map[string]interfa
 	dt := devices[device]
 	switch dt {
 	case PressureDeviceType:
-		return PressureDevice{timestamp, fields["celcius"].(float64), fields["mbar"].(float64)}
+		return PressureDevice{
+			timestamp, 
+			fields["celcius"].(float64), 
+			fields["mbar"].(float64),
+		}
 	case TrackingDeviceType:
-		return TrackingDevice{timestamp, fields["latitude"].(float64), fields["longitude"].(float64)}
+		return TrackingDevice{
+			timestamp, 
+			fields["latitude"].(float64), 
+			fields["longitude"].(float64),
+		}
 	default:
 		panic(fmt.Sprintf("Unknown DeviceType: %s", dt))
 	}
