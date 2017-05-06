@@ -2,11 +2,12 @@ package main
 
 import (
 	BQ "cloud.google.com/go/bigquery"
-	"encoding/json"
-	"fmt"
-	MQTT "github.com/eclipse/org.eclipse.paho.mqtt.golang"
+  MQTT "github.com/eclipse/org.eclipse.paho.mqtt.golang"
 	"golang.org/x/net/context"
-	"os"
+  "google.golang.org/api/iterator"
+  "encoding/json"
+  "fmt"
+  "os"
 )
 
 var ttn_app string = os.Getenv("TTN_APP")
@@ -60,7 +61,6 @@ var subscribeHandler MQTT.MessageHandler = func(client MQTT.Client, msg MQTT.Mes
 }
 
 func decode(bytes []byte) (string, string, interface{}) {
-	fmt.Println("1")
 	var f interface{}
 	err := json.Unmarshal(bytes, &f)
 
@@ -81,18 +81,72 @@ func decode(bytes []byte) (string, string, interface{}) {
 	return app_id, dev_id, item
 }
 
+//TODO Cache datasets
+func createDataSetIfNotExists(bqClient *BQ.Client, datasetID string) error {
+  ctx := context.Background()
+
+  it := bqClient.Datasets(ctx)
+  for {
+    dataset, err := it.Next()
+    if err == iterator.Done {
+      fmt.Println("No dataset found")
+      break
+    }
+    if err != nil {
+      return err
+    }
+    if dataset.DatasetID == datasetID {
+      return nil
+    }
+  }
+  fmt.Println("Creating Dataset ", datasetID)
+  return bqClient.Dataset(datasetID).Create(ctx)
+}
+
+//TODO cache tables
+func createTableIfNotExists(bqClient *BQ.Client, datasetID string, tableID string, item interface{}) error {
+  ctx := context.Background()
+
+  ts := bqClient.Dataset(datasetID).Tables(ctx)
+  for {
+    t, err := ts.Next()
+    if err == iterator.Done {
+      fmt.Println("No Table found")
+      break
+    }
+    if err != nil {
+      return err
+    }
+    if t.TableID == tableID {
+      return nil
+    }
+  }
+
+  schema, err := BQ.InferSchema(item)
+  if err != nil {
+    return err
+  }
+
+  fmt.Println("Creating Table ", tableID)
+  return bqClient.Dataset(datasetID).Table(tableID).Create(ctx, schema)
+}
+
 func insertRow(datasetID, tableID string, item interface{}) error {
 	ctx := context.Background()
-	bqClient, err := BQ.NewClient(ctx, project)
-	if err != nil {
-		panic(err)
+	bqClient, err := BQ.NewClient(ctx, project) 
+  if err != nil {
+		return err
 	}
+  if err := createDataSetIfNotExists(bqClient, datasetID);err != nil {
+    return err
+  }
+  if err := createTableIfNotExists(bqClient, datasetID, tableID, item);err != nil {
+    return err
+  }
 
 	u := bqClient.Dataset(datasetID).Table(tableID).Uploader()
-
 	if err := u.Put(ctx, item); err != nil {
 		return err
 	}
-
 	return nil
 }
