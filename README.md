@@ -11,6 +11,7 @@ It requires the following ENV variables
 | TTN_APP | Name of the application in console.thethingsnetwork.org  |
 | TTN_KEY | Access key of TTN application |
 | GCP_PROJECT | id of the Google Cloud Project |
+| MQTT_CLIENT_ID | client id that subscribes to the MQTT topic |
 
 It expexts the payload of the TTN message to contain a json with a list of name/values
 
@@ -24,13 +25,14 @@ NOTE: the GOOGLE_APPLICATION_CREDENTIALS is set to /credentials in the Dockerfil
 
 copy the service account json to a location on the docker host and add that as a volume
 ```
-docker run -d 
-  -e TTN_APP="app name" 
-  -e TTN_KEY="app key" 
-  -e GCP_PROJECT="google cloud project" 
-  -v /local/path/to/credentials:/credentials 
-  --name mqtt-bq 
-  your-org/mqtt-bq
+docker run -d \
+  -e TTN_APP="app name" \ 
+  -e TTN_KEY="app key" \
+  -e GCP_PROJECT="google cloud project" \
+  -e MQTT_CLIENT_ID="my-mqtt-client" \
+  -v /local/path/to/credentials:/credentials \
+  --name mqtt-bq \
+  organisation/mqtt-bq
 ```
 
 
@@ -46,5 +48,5 @@ to add a device you need to (in devices.go)
  * Add your device to the the devices list
  * If necessary create a DeviceType and a corresponding Struct
 
-Based on the struct the bigquery part will infer the schame 
+Based on the struct the bigquery part will infer the schema
 
