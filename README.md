@@ -16,3 +16,17 @@ It expexts the payload of the TTN message to contain a json with a list of name/
 
 It will try to map these to a struct in devices.go and insert that struct into a table in bigquery
 
+## Data model
+
+The application will attempt to create a Dataset for the TTN Application and Tables in there for the devices if they do not already exist.
+It will infer the schema based on the Struct that is used (see devices.go)
+
+## Add a Device
+
+At this point in time to add a device recompilation is needed
+to add a device you need to (in devices.go)
+ * Add your device to the the devices list
+ * If necessary create a DeviceType and a corresponding Struct
+
+Based on the struct the bigquery part will infer the schame 
+
