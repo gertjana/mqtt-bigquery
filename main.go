@@ -2,17 +2,22 @@ package main
 
 import (
 	BQ "cloud.google.com/go/bigquery"
-  MQTT "github.com/eclipse/org.eclipse.paho.mqtt.golang"
+	"encoding/json"
+	"fmt"
+	MQTT "github.com/eclipse/org.eclipse.paho.mqtt.golang"
 	"golang.org/x/net/context"
-  "google.golang.org/api/iterator"
-  "encoding/json"
-  "fmt"
-  "os"
+	"google.golang.org/api/iterator"
+	"os"
+	"time"
 )
 
 var ttn_app string = os.Getenv("TTN_APP")
 var ttn_key string = os.Getenv("TTN_KEY")
 var project string = os.Getenv("GCP_PROJECT")
+var mqttClientId string = os.Getenv("MQTT_CLIENT_ID")
+
+var partition = BQ.TimePartitioning{24 * time.Hour}
+var sqlDialect = BQ.UseStandardSQL()
 
 func main() {
 	done := make(chan bool)
@@ -21,7 +26,7 @@ func main() {
 	opts.AddBroker("tcp://eu.thethings.network:1883")
 	opts.SetUsername(ttn_app)
 	opts.SetPassword(ttn_key)
-	opts.SetClientID("mqtt-bigquery-bridge")
+	opts.SetClientID(mqttClientId)
 
 	mqttClient := MQTT.NewClient(opts)
 	if token := mqttClient.Connect(); token.Wait() && token.Error() != nil {
@@ -83,66 +88,66 @@ func decode(bytes []byte) (string, string, interface{}) {
 
 //TODO Cache datasets
 func createDataSetIfNotExists(bqClient *BQ.Client, datasetID string) error {
-  ctx := context.Background()
+	ctx := context.Background()
 
-  it := bqClient.Datasets(ctx)
-  for {
-    dataset, err := it.Next()
-    if err == iterator.Done {
-      fmt.Println("No dataset found")
-      break
-    }
-    if err != nil {
-      return err
-    }
-    if dataset.DatasetID == datasetID {
-      return nil
-    }
-  }
-  fmt.Println("Creating Dataset ", datasetID)
-  return bqClient.Dataset(datasetID).Create(ctx)
+	it := bqClient.Datasets(ctx)
+	for {
+		dataset, err := it.Next()
+		if err == iterator.Done {
+			fmt.Println("No dataset found")
+			break
+		}
+		if err != nil {
+			return err
+		}
+		if dataset.DatasetID == datasetID {
+			return nil
+		}
+	}
+	fmt.Println("Creating Dataset ", datasetID)
+	return bqClient.Dataset(datasetID).Create(ctx)
 }
 
 //TODO cache tables
 func createTableIfNotExists(bqClient *BQ.Client, datasetID string, tableID string, item interface{}) error {
-  ctx := context.Background()
+	ctx := context.Background()
 
-  ts := bqClient.Dataset(datasetID).Tables(ctx)
-  for {
-    t, err := ts.Next()
-    if err == iterator.Done {
-      fmt.Println("No Table found")
-      break
-    }
-    if err != nil {
-      return err
-    }
-    if t.TableID == tableID {
-      return nil
-    }
-  }
+	ts := bqClient.Dataset(datasetID).Tables(ctx)
+	for {
+		t, err := ts.Next()
+		if err == iterator.Done {
+			fmt.Println("No Table found")
+			break
+		}
+		if err != nil {
+			return err
+		}
+		if t.TableID == tableID {
+			return nil
+		}
+	}
 
-  schema, err := BQ.InferSchema(item)
-  if err != nil {
-    return err
-  }
+	schema, err := BQ.InferSchema(item)
+	if err != nil {
+		return err
+	}
 
-  fmt.Println("Creating Table ", tableID)
-  return bqClient.Dataset(datasetID).Table(tableID).Create(ctx, schema)
+	fmt.Println("Creating Table ", tableID)
+	return bqClient.Dataset(datasetID).Table(tableID).Create(ctx, schema, partition, sqlDialect)
 }
 
 func insertRow(datasetID, tableID string, item interface{}) error {
 	ctx := context.Background()
-	bqClient, err := BQ.NewClient(ctx, project) 
-  if err != nil {
+	bqClient, err := BQ.NewClient(ctx, project)
+	if err != nil {
 		return err
 	}
-  if err := createDataSetIfNotExists(bqClient, datasetID);err != nil {
-    return err
-  }
-  if err := createTableIfNotExists(bqClient, datasetID, tableID, item);err != nil {
-    return err
-  }
+	if err := createDataSetIfNotExists(bqClient, datasetID); err != nil {
+		return err
+	}
+	if err := createTableIfNotExists(bqClient, datasetID, tableID, item); err != nil {
+		return err
+	}
 
 	u := bqClient.Dataset(datasetID).Table(tableID).Uploader()
 	if err := u.Put(ctx, item); err != nil {

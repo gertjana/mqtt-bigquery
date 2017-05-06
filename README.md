@@ -16,6 +16,24 @@ It expexts the payload of the TTN message to contain a json with a list of name/
 
 It will try to map these to a struct in devices.go and insert that struct into a table in bigquery
 
+## Docker
+
+the makefile will create a Dockerfile (change the organisation)
+
+NOTE: the GOOGLE_APPLICATION_CREDENTIALS is set to /credentials in the Dockerfile
+
+copy the service account json to a location on the docker host and add that as a volume
+```
+docker run -d 
+  -e TTN_APP="app name" 
+  -e TTN_KEY="app key" 
+  -e GCP_PROJECT="google cloud project" 
+  -v /local/path/to/credentials:/credentials 
+  --name mqtt-bq 
+  your-org/mqtt-bq
+```
+
+
 ## Data model
 
 The application will attempt to create a Dataset for the TTN Application and Tables in there for the devices if they do not already exist.

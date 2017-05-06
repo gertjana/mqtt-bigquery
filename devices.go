@@ -16,8 +16,8 @@ var devices = map[string]int{
 
 type PressureDevice struct {
 	Timestamp string
-	Celcius float64
-	Mbar    float64
+	Celcius   float64
+	Mbar      float64
 }
 
 type TrackingDevice struct {
@@ -31,14 +31,14 @@ func deviceFromFields(device string, timestamp string, fields map[string]interfa
 	switch dt {
 	case PressureDeviceType:
 		return PressureDevice{
-			timestamp, 
-			fields["celcius"].(float64), 
+			timestamp,
+			fields["celcius"].(float64),
 			fields["mbar"].(float64),
 		}
 	case TrackingDeviceType:
 		return TrackingDevice{
-			timestamp, 
-			fields["latitude"].(float64), 
+			timestamp,
+			fields["latitude"].(float64),
 			fields["longitude"].(float64),
 		}
 	default:

@@ -5,11 +5,11 @@ all: build-container
 
 build-app:
 	@go fmt *.go
-	@go build -o $(dist_mqtt_bq) main.go
+	@go build -o $(dist_mqtt_bq) main.go devices.go
 
 build-container:
 	@go fmt *.go
-	@GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o $(dist_mqtt_bq) main.go
+	@GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o $(dist_mqtt_bq) main.go devices.go
 	@docker build -t $(docker-container) .
 
 dev:
