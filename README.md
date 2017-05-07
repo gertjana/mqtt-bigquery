@@ -19,7 +19,7 @@ It will try to map these to a struct in devices.go and insert that struct into a
 
 ## Docker
 
-the makefile will create a Dockerfile (change the organisation)
+the makefile will create a Docker image
 
 NOTE: the GOOGLE_APPLICATION_CREDENTIALS is set to /credentials in the Dockerfile
 
